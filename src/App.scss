@@ -1,0 +1,59 @@
+html, body, #root {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.App {
+  width: 100%;
+  height: 100%;
+  position: relative;
+
+  &__StartStopButton {
+    $size: 20vw;
+
+    width: $size;
+    height: $size;
+    background-color: lightgray;
+    position: absolute;
+    left: calc(50% - #{$size / 2});
+    top: calc(50% - #{$size / 2});
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+.IntervalsTimeline {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+
+  $dayHeight: 2vw;
+
+  &__Day {
+    width: 100%;
+    border: 1px solid lightgray;
+    height: $dayHeight;
+    position: relative;
+  }
+
+  &__Interval {
+    position: absolute;
+    background-color: gray;
+    height: $dayHeight;
+    min-width: 1px;
+  }
+
+  &__HourTitles {
+    display: flex;
+    flex-direction: row;
+  }
+
+  &__HourTitle {
+    flex: 1 1 auto;
+    text-align: center;
+    border-right: 1px solid lightgray;
+  }
+}
