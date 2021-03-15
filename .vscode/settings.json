@@ -1,4 +1,6 @@
 {
     "typescript.tsdk": "node_modules\\typescript\\lib",
-    "todo-tree.tree.showBadges": false
+    "todo-tree.tree.showBadges": true,
+    "todo-tree.tree.disableCompactFolders": true,
+    "todo-tree.tree.showCountsInTree": true
 }
