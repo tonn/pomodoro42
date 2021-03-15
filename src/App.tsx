@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-globals */
 import { bind } from 'lodash-decorators';
 import React from 'react';
 import './App.scss';
@@ -22,7 +23,7 @@ type TimerStateType = 'focusing' | 'stopped';
 interface ITimeInterval {
   start: Date,
   stop?: Date,
-  task?: string
+  context?: string
 }
 
 interface ITimeIntervalViewModel {
@@ -153,14 +154,18 @@ export class App extends React.Component<{}, {}> {
     }
 
     this.timerState = state;
+
+    this.save();
     this.setState({});
   }
 
   @bind
   private startStopButtonClick() {
-    this.setTimerState(this.timerState === 'focusing' ? 'stopped' : 'focusing');
+    if (this.timerState === 'focusing' && !confirm('Are you shure to stop?')) {
+      return;
+    }
 
-    this.save();
+    this.setTimerState(this.timerState === 'focusing' ? 'stopped' : 'focusing');
   }
 
   private save() {
@@ -205,7 +210,6 @@ export class App extends React.Component<{}, {}> {
   private removeContext(e: React.MouseEvent, context: IContext) {
     e.stopPropagation();
 
-    // eslint-disable-next-line no-restricted-globals
     if (confirm(`Remove "${context.name}"?`)) {
       _.remove(this.contexts, context);
     }
@@ -236,12 +240,10 @@ export class App extends React.Component<{}, {}> {
               <div className={appElem('Context', context.current ? 'Current' : undefined)} onClick={() => this.contextClicked(context)}>
                 <div className={appElem('ContextColor')} style={{ backgroundColor: context.color }} />
 
-                <input value={context.name} onChange={e => this.contextNameChanged(e, context)} readOnly={context.readonly}/>
+                <input value={context.name} onChange={e => this.contextNameChanged(e, context)} readOnly={context.readonly} />
 
                 { context.readonly ? null :
-                  <div className={appElem('ContextRemove')} onClick={e => this.removeContext(e, context)}>
-                    <FontAwesomeIcon icon='trash' />
-                  </div> }
+                  <FontAwesomeIcon icon='trash' className={appElem('ContextRemove')} onClick={e => this.removeContext(e, context)} /> }
               </div>))
           }
           <div className={appElem('AddContextButton')} onClick={this.addContext}>Add</div>

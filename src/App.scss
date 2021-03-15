@@ -57,10 +57,12 @@ html, body, #root {
 
     &Color {
       @include size($height * .8);
+      border-radius: 2px;
     }
 
     &Remove {
       @include fadeUnhovered;
+      font-size: $spacing * 1.2;
     }
 
     > input {

@@ -78,8 +78,8 @@
   bottom: $bottom;
 }
 
-@mixin fadeUnhovered {
-  opacity: .2;
+@mixin fadeUnhovered($fadedOpacity: .1) {
+  opacity: $fadedOpacity;
   transition: opacity .5s;
 
   &:hover {
