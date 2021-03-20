@@ -7,6 +7,8 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import fontawesome from '@fortawesome/fontawesome'
 import { faTrash } from '@fortawesome/free-solid-svg-icons';
 import _ from 'lodash';
+import { GetIntersection, IInterval } from './IInterval';
+import { Effect1 } from './Effect1';
 
 fontawesome.library.add(faTrash as any);
 
@@ -230,6 +232,8 @@ export class App extends React.Component<{}, {}> {
 
     return (
       <div className={appBlock()}>
+        <Effect1 className={appElem('Effect')} State={timerState === 'stopped' ? 1 : 2} />
+
         <div className={appElem('StartStopButton')} onClick={this.startStopButtonClick}>
           { timerState === 'stopped' ? 'Focus!' : 'Stop' }
         </div>

@@ -71,6 +71,11 @@ html, body, #root {
     }
   }
 
+  &__Effect {
+    @include absolute-lt;
+    @include size(100%);
+    z-index: -1;
+  }
 }
 
 .IntervalsTimeline {

@@ -1,0 +1,61 @@
+@import 'shared';
+
+.Effect1 {
+  $block: &;
+
+  &__A {
+    background-color: #df5252;
+  }
+
+  &__B {
+    background-color: #5bb15b;
+  }
+
+  &__A, &__B {
+    transition: width .5s, height .5s, left .5s, top .5s, border-radius .5s, opacity .5s;
+  }
+
+  &_State1 {
+    background-color: #df5252;
+
+    #{$block}__ {
+      &A {
+        @include size(100%);
+        @include absolute-lt(0%);
+        border-radius: 0%;
+        opacity: 0;
+        z-index: 2;
+      }
+
+      &B {
+        @include size(0%);
+        @include absolute-lt(50%);
+        border-radius: 100%;
+        opacity: 1;
+        z-index: 1;
+      }
+    }
+  }
+
+  &_State2 {
+    background-color: #5bb15b;
+
+    #{$block}__ {
+      &A {
+        @include size(0%);
+        @include absolute-lt(50%);
+        border-radius: 100%;
+        opacity: 1;
+        z-index: 1;
+      }
+
+      &B {
+        @include size(100%);
+        @include absolute-lt(0%);
+        border-radius: 0%;
+        opacity: 0;
+        z-index: 2;
+      }
+    }
+  }
+}
