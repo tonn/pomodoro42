@@ -16,8 +16,8 @@ html, body, #root {
   &__StartStopButton {
     $size: 20vw;
 
-    @include size($size);
-    @include absolute-lt(calc(50% - #{$size / 2}));
+    @include size(100%, $size);
+    @include absolute-lb;
     background-color: $baseColor;
     position: absolute;
 
@@ -75,6 +75,12 @@ html, body, #root {
     @include absolute-lt;
     @include size(100%);
     z-index: -1;
+  }
+
+  &__Timer {
+    width: 100%;
+    font-size: 10vw;
+    text-align: center;
   }
 }
 

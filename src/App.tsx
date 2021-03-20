@@ -18,18 +18,20 @@ fontawesome.library.add(faTrash as any);
 // TODO: 4. recommendation to rest and work
 // TODO: 5. settings
 // TODO: 6. pwa-update button
+// TODO: 7. Подсвечивать часы онлайна
 
 
 type TimerStateType = 'focusing' | 'stopped';
 
-interface ITimeInterval {
+interface IFocusingInterval {
   start: Date,
   stop?: Date,
-  context?: string
+  context?: string,
+  contextColor?: string
 }
 
 interface ITimeIntervalViewModel {
-  interval: ITimeInterval,
+  interval: IFocusingInterval,
   left: number,
   width: number
 }
@@ -43,13 +45,30 @@ function getStartAndEndOfDay(day: Date): { start: Date, end: Date } {
   return { start, end };
 }
 
+function MsToMin(time: number) {
+  return time / 1000 / 60;
+}
+
+function MsToTimeString(ms: number): string {
+  let seconds = ms % 60000;
+  let minutes = ms - seconds;
+
+  seconds /= 1000;
+  minutes /= 60000;
+
+  const minutesString = minutes.toFixed(0);
+  const secondsString = (seconds < 10 ? '0' : '') + seconds.toFixed(0);
+
+  return `${minutesString}:${secondsString}`
+}
+
 const DayTicksLength = 24 * 60 * 60 * 1000;
 const LSIntervals = 'LSIntervals';
 const LSContexts = 'LSContexts';
 const Colors = ['blue', 'red', 'green', 'yellow', 'black', 'orange'];
 
 export class IntervalsTimeline extends React.Component<
-  { Intervals: ITimeInterval[] },
+  { Intervals: IFocusingInterval[] },
   { DaysOffset: number, DaysCount: number }> {
 
   private _hours = [...Array(24).keys()].map(h => h + 1);
@@ -94,7 +113,7 @@ export class IntervalsTimeline extends React.Component<
           this.getDays().map(day => (
             <div className={elem('Day')}>
               {day.map(ivm => (
-                <div className={elem('Interval')} style={{ left: `${ivm.left}%`, width: `${ivm.width}%` }}>
+                <div className={elem('Interval')} style={{ left: `${ivm.left}%`, width: `${ivm.width}%`, backgroundColor: ivm.interval.contextColor }}>
                 </div>
               ))}
             </div>
@@ -112,16 +131,20 @@ interface IContext { name: string, color: string, current: boolean, readonly?: t
 export class App extends React.Component<{}, {}> {
   private timerState: TimerStateType = 'stopped';
   private intervalRef: NodeJS.Timeout | undefined;
-  private timeIntervals: ITimeInterval[] = [];
-  private currentTimeInterval: ITimeInterval | undefined;
+  private timeIntervals: IFocusingInterval[] = [];
+  private currentTimeInterval: IFocusingInterval | undefined;
   private contexts: IContext[] = [{ name: 'default', color: 'lightgray', current: true, readonly: true }];
 
-
   private config = {
-    pomodoroLength: 25,
-    restLength: 5,
-    longRestPerMinutes: 120,
-    longRestLength: 60
+    // pomodoroMinutes: 25,
+    // smallRestMinutes: 5,
+    // longRestMinutes: 60,
+    // longRestPerPomodoros: 4
+
+    pomodoroMinutes: 1,
+    smallRestMinutes: 1,
+    longRestMinutes: 5,
+    longRestPerPomodoros: 4
   }
 
   constructor(props: any) {
@@ -133,11 +156,17 @@ export class App extends React.Component<{}, {}> {
   @bind
   private tick() {
     if (!this.currentTimeInterval) {
-      this.currentTimeInterval = { start: new Date() };
+      const context = this.currentContext;
+
+      this.currentTimeInterval = { start: new Date(), context: context.name, contextColor: context.color };
       this.timeIntervals.push(this.currentTimeInterval);
     }
 
     this.setState({});
+  }
+
+  private get currentContext(): IContext {
+    return this.contexts.find(ctx => ctx.current)!;
   }
 
   private setTimerState(state: TimerStateType) {
@@ -163,7 +192,7 @@ export class App extends React.Component<{}, {}> {
 
   @bind
   private startStopButtonClick() {
-    if (this.timerState === 'focusing' && !confirm('Are you shure to stop?')) {
+    if (this.timerState === 'focusing' && !confirm('Are you sure to stop?')) {
       return;
     }
 
@@ -227,8 +256,61 @@ export class App extends React.Component<{}, {}> {
     this.setState({});
   }
 
+  getFocusingTimeInInterval(start: Date, end: Date) {
+    const intervals = this.timeIntervals.map(i => GetIntersection({ start, end }, { start: i.start, end: i.stop || end })).filter(i => i !== undefined) as IInterval[];
+
+    return MsToMin(_.sum(intervals.map(i => i.end.getTime() - i.start.getTime())));
+  }
+
+  getRestingTimeInInterval(start: Date, end: Date) {
+    const focusingIntervals = this.timeIntervals.map(i => GetIntersection({ start, end }, { start: i.start, end: i.stop || end })).filter(i => i !== undefined) as IInterval[];
+    const restingIntervals: IInterval[] = [];
+
+    for (let i = 0; i < focusingIntervals.length; ++i) {
+      const focusingInterval = focusingIntervals[i];
+
+      if (i === 0) {
+        if (start < focusingInterval.start) {
+          restingIntervals.push({ start, end: focusingInterval.start });
+        }
+      }
+
+      if (i === focusingIntervals.length - 1) {
+        if (end > focusingInterval.end) {
+          restingIntervals.push({ start: focusingInterval.end, end });
+        }
+      }
+
+      if (i !== focusingIntervals.length - 1) {
+        const nextInterval = focusingIntervals[i + 1];
+
+        if (focusingInterval.end < nextInterval.start) {
+          restingIntervals.push({ start: focusingInterval.end, end: nextInterval.start });
+        }
+      }
+    }
+
+    return MsToMin(_.sum(restingIntervals.map(i => i.end.getTime() - i.start.getTime())));
+  }
+
+  private timeAnalysis() {
+    const { config } = this;
+    const now = new Date();
+    const longRestMonitorIntervalStart = new Date();
+    longRestMonitorIntervalStart.setMinutes(now.getMinutes() - (config.pomodoroMinutes + config.smallRestMinutes) * config.longRestPerPomodoros)
+
+    const currentFocusingTime = this.currentTimeInterval ? now.getTime() - this.currentTimeInterval.start.getTime() : undefined;
+    const needToSmallRest = currentFocusingTime && MsToMin(currentFocusingTime) >= config.pomodoroMinutes;
+    const restTimeForLongPeriod = this.getRestingTimeInInterval(longRestMonitorIntervalStart, now);
+    const needToLongRest = restTimeForLongPeriod < config.smallRestMinutes * config.longRestPerPomodoros;
+
+    return { focusingTime: currentFocusingTime, needToSmallRest, restTimeForLongPeriod, needToLongRest }
+  }
+
   render() {
     const { timerState } = this;
+
+    const analysis = this.timeAnalysis();
 
     return (
       <div className={appBlock()}>
@@ -237,7 +319,9 @@ export class App extends React.Component<{}, {}> {
         <div className={appElem('StartStopButton')} onClick={this.startStopButtonClick}>
           { timerState === 'stopped' ? 'Focus!' : 'Stop' }
         </div>
+
         <IntervalsTimeline Intervals={this.timeIntervals} />
+
         <div className={appElem('Contexts')}>
           {
             this.contexts.map(context => (
@@ -248,9 +332,19 @@ export class App extends React.Component<{}, {}> {
 
                 { context.readonly ? null :
                   <FontAwesomeIcon icon='trash' className={appElem('ContextRemove')} onClick={e => this.removeContext(e, context)} /> }
-              </div>))
+              </div>
+            ))
           }
           <div className={appElem('AddContextButton')} onClick={this.addContext}>Add</div>
+        </div>
+
+        <div>
+          <div>Recomendations</div>
+          { JSON.stringify(analysis) }
+        </div>
+
+        <div className={appElem('Timer')}>
+          {MsToTimeString(analysis.focusingTime || 0)}
         </div>
       </div>
     );
