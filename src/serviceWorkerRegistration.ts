@@ -1,6 +1,8 @@
 // This optional code is used to register a service worker.
 // register() is not called by default.
 
+import { ReplaySubject } from "rxjs";
+
 // This lets the app load faster on subsequent visits in production, and gives
 // it offline capabilities. However, it also means that developers (and users)
 // will only see deployed updates on subsequent visits to a page, after all the
@@ -9,6 +11,10 @@
 
 // To learn more about the benefits of this model and instructions on how to
 // opt-in, read https://cra.link/PWA
+
+const _updateAvailable = new ReplaySubject<void>();
+
+export const PWAUpdateAvailable = _updateAvailable.asObservable();
 
 const isLocalhost = Boolean(
   window.location.hostname === 'localhost' ||
@@ -61,6 +67,10 @@ function registerValidSW(swUrl: string, config?: Config) {
   navigator.serviceWorker
     .register(swUrl)
     .then((registration) => {
+      if (registration.active && registration.waiting) {
+        _updateAvailable.next();
+      }
+
       registration.onupdatefound = () => {
         const installingWorker = registration.installing;
         if (installingWorker == null) {
@@ -76,6 +86,8 @@ function registerValidSW(swUrl: string, config?: Config) {
                 'New content is available and will be used when all ' +
                   'tabs for this page are closed. See https://cra.link/PWA.'
               );
+
+              _updateAvailable.next();
 
               // Execute callback
               if (config && config.onUpdate) {
@@ -134,6 +146,18 @@ export function unregister() {
     navigator.serviceWorker.ready
       .then((registration) => {
         registration.unregister();
+      })
+      .catch((error) => {
+        console.error(error.message);
+      });
+  }
+}
+
+export async function skipWaiting() {
+  if ('serviceWorker' in navigator) {
+    await navigator.serviceWorker.ready
+      .then((registration) => {
+        registration.waiting?.postMessage({type: 'SKIP_WAITING'});
       })
       .catch((error) => {
         console.error(error.message);

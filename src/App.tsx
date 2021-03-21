@@ -9,17 +9,23 @@ import { faTrash } from '@fortawesome/free-solid-svg-icons';
 import _ from 'lodash';
 import { GetIntersection, IInterval } from './IInterval';
 import { Effect1 } from './Effect1';
+import { PWAUpdateAvailable, skipWaiting } from './serviceWorkerRegistration';
+import { Subject } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 
 fontawesome.library.add(faTrash as any);
 
-// TODO: 1. save state to localstorage
-// TODO: 2. appearence
-// TODO: 3. contexts
-// TODO: 4. recommendation to rest and work
-// TODO: 5. settings
-// TODO: 6. pwa-update button
-// TODO: 7. Подсвечивать часы онлайна
+// TODO:
+// Показывать кнопки отдыха
+// Показывать тайер отдыха
+// Сигнал звуковой
+// Показывать статистику по контекстам - как миниму сумарное время за сегодня
+// Сделать настройку времени начала рабочего дня
 
+// Контрол настройки
+// PWA-обновление
+// Подсветка интервалов когда компьютер был включен
+// Дизайн
 
 type TimerStateType = 'focusing' | 'stopped';
 
@@ -128,12 +134,13 @@ const { block, elem } = BEM('IntervalsTimeline');
 
 interface IContext { name: string, color: string, current: boolean, readonly?: true }
 
-export class App extends React.Component<{}, {}> {
+export class App extends React.Component<{}, { updateAvailable: boolean }> {
   private timerState: TimerStateType = 'stopped';
   private intervalRef: NodeJS.Timeout | undefined;
   private timeIntervals: IFocusingInterval[] = [];
   private currentTimeInterval: IFocusingInterval | undefined;
   private contexts: IContext[] = [{ name: 'default', color: 'lightgray', current: true, readonly: true }];
+  private _unmounted$ = new Subject<void>();
 
   private config = {
     // pomodoroMinutes: 25,
@@ -150,7 +157,19 @@ export class App extends React.Component<{}, {}> {
   constructor(props: any) {
     super(props);
 
+    this.state = { updateAvailable: false };
+
     this.restore();
+  }
+
+  componentDidMount() {
+    PWAUpdateAvailable.pipe(takeUntil(this._unmounted$)).subscribe(() => {
+      this.setState({ updateAvailable: true });
+    })
+  }
+
+  componentWillUnmount() {
+    this._unmounted$.next();
   }
 
   @bind
@@ -307,8 +326,13 @@ export class App extends React.Component<{}, {}> {
     return { focusingTime: currentFocusingTime, needToSmallRest, restTimeForLongPeriod, needToLongRest }
   }
 
+  private async appUpdate() {
+    await skipWaiting();
+    window.location.reload();
+  }
+
   render() {
-    const { timerState } = this;
+    const { timerState, state: { updateAvailable } } = this;
 
     const analysis = this.timeAnalysis();
 
@@ -346,6 +370,8 @@ export class App extends React.Component<{}, {}> {
         <div className={appElem('Timer')}>
           {MsToTimeString(analysis.focusingTime || 0)}
         </div>
+
+        {updateAvailable ? <button onClick={this.appUpdate}>Update!</button> : null}
       </div>
     );
   }
