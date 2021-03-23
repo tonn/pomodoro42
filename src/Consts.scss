@@ -1,0 +1,22 @@
+$RedB: #FF595E;
+$RedF: #DDD;
+$YellowB: #FFCA3A;
+$YellowF: #333;
+$GreenB: #8AC926;
+$GreenF: #333;
+$BlueB: #1982C4;
+$BlueF: #DDD;
+$PurpleB: #6A4C93;
+$PurpleF: #DDD;
+
+$spacing: .3vmin;
+
+@mixin color($background, $foreground, $border: "") {
+  background-color: $background;
+  color: $foreground;
+  border-color: borderColor(unquote($border));
+}
+
+@function borderColor($color) {
+  @return ajust-hue($color, 50deg);
+}

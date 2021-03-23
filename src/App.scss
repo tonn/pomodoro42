@@ -1,52 +1,50 @@
 @import 'shared';
-
-$spacing: 2vw;
-$baseColor: lightgray;
+@import 'consts';
 
 .App {
   @include size(100%);
-  position: relative;
+  @include absolute-lt;
 
-  &__StartStopButton {
-    $size: 20vw;
+  &__Buttons {
+    @include flex;
+    font-size: $spacing * 15;
 
-    @include size(100%, $size);
-    @include absolute-lb;
-    background-color: $baseColor;
-    position: absolute;
+    > * {
+      @include size($spacing * 20);
+      @include flex-center;
 
-    display: flex;
-    align-items: center;
-    justify-content: center;
+      &:hover {
+        background-color: #fff5;
+      }
+    }
   }
 
   &__Contexts {
     @include flex(column);
     @include marginSpaceBetweenVertical($spacing / 2);
-    border: 1px solid $baseColor;
     margin: $spacing;
     padding: $spacing;
+    width: 100 * $spacing;
+    background-color: #fff5;
+    border-radius: $spacing;
   }
 
   &__Context {
-    $backgroundColor: lighten($baseColor, 15%);
-    $height: 4vw;
+    $height: $spacing * 7;
     @include flex(row);
     @include marginSpaceBetweenHorizontal($spacing / 2);
     height: $height;
     flex-direction: row;
     align-items: center;
-    background-color: $backgroundColor;
-    //box-sizing: border-box;
     padding: $spacing / 2;
-    border: 1px solid $backgroundColor;
+    border: 1px solid transparent;
 
     &:hover {
-      border: 1px solid $baseColor;
+      border: 1px solid;
     }
 
     &_Current {
-      background-color: lighten($baseColor, 10%);
+      background-color: #FFF2;
     }
 
     &Color {
@@ -56,13 +54,17 @@ $baseColor: lightgray;
 
     &Remove {
       @include fadeUnhovered;
-      font-size: $spacing * 1.2;
+      font-size: $spacing * 5;
     }
 
     > input {
       background-color: transparent;
       border: none;
     }
+  }
+
+  &__AddContextButton {
+    text-align: center;
   }
 
   &__Effect {
@@ -72,24 +74,39 @@ $baseColor: lightgray;
   }
 
   &__Timer {
+    @include flex-center(column);
+    font-family: monospace;
     width: 100%;
-    font-size: 10vw;
+    font-size: $spacing * 40;
     text-align: center;
+  }
+
+  &__Debug {
+    font-family: monospace;
   }
 }
 
 .IntervalsTimeline {
   display: flex;
   flex-direction: column;
-  width: 100%;
+  //width: 100%;
 
-  $dayHeight: 2vw;
+  $dayHeight: $spacing * 10;
+
+  margin: $spacing;
+  padding: $spacing;
+  background-color: #fff5;
+  border-radius: $spacing;
 
   &__Day {
-    width: 100%;
-    border: 1px solid $baseColor;
+    //width: 100%;
+    border: 1px solid;
     height: $dayHeight;
     position: relative;
+
+    &:not(:last-child) {
+      border-bottom: none;
+    }
   }
 
   &__Interval {
@@ -109,6 +126,6 @@ $baseColor: lightgray;
   &__HourTitle {
     flex: 1 1 auto;
     text-align: center;
-    border-right: 1px solid $baseColor;
+    border-right: 1px solid borderColor($BlueF);
   }
 }

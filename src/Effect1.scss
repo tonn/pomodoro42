@@ -1,14 +1,15 @@
 @import 'shared';
+@import 'consts';
 
 .Effect1 {
   $block: &;
 
   &__A {
-    background-color: #df5252;
+    background-color: $RedB;
   }
 
   &__B {
-    background-color: #5bb15b;
+    background-color: $GreenB;
   }
 
   &__A, &__B {

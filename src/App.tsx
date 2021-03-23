@@ -5,15 +5,16 @@ import './App.scss';
 import { BEM } from './BEM';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import fontawesome from '@fortawesome/fontawesome'
-import { faTrash } from '@fortawesome/free-solid-svg-icons';
+import { faTrash, faPlus, faPlay, faStop, faCoffee, faGamepad } from '@fortawesome/free-solid-svg-icons';
 import _ from 'lodash';
 import { GetIntersection, IInterval } from './IInterval';
 import { Effect1 } from './Effect1';
 import { PWAUpdateAvailable, skipWaiting } from './serviceWorkerRegistration';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
+import { MultiLineString } from './helpers';
 
-fontawesome.library.add(faTrash as any);
+fontawesome.library.add(...[faTrash, faPlus, faPlay, faStop, faCoffee, faGamepad] as any[]);
 
 // TODO:
 // Показывать кнопки отдыха
@@ -142,15 +143,15 @@ export class App extends React.Component<{}, { updateAvailable: boolean }> {
   private contexts: IContext[] = [{ name: 'default', color: 'lightgray', current: true, readonly: true }];
   private _unmounted$ = new Subject<void>();
 
-  private config = {
-    // pomodoroMinutes: 25,
-    // smallRestMinutes: 5,
-    // longRestMinutes: 60,
-    // longRestPerPomodoros: 4
-
+  private config = (!process.env.NODE_ENV || process.env.NODE_ENV === 'development') ? {
     pomodoroMinutes: 1,
     smallRestMinutes: 1,
     longRestMinutes: 5,
+    longRestPerPomodoros: 4
+  } : {
+    pomodoroMinutes: 25,
+    smallRestMinutes: 5,
+    longRestMinutes: 60,
     longRestPerPomodoros: 4
   }
 
@@ -216,6 +217,16 @@ export class App extends React.Component<{}, { updateAvailable: boolean }> {
     }
 
     this.setTimerState(this.timerState === 'focusing' ? 'stopped' : 'focusing');
+  }
+
+  @bind
+  private startSmallTimeout() {
+
+  }
+
+  @bind
+  private startLongTimeout() {
+
   }
 
   private save() {
@@ -332,17 +343,13 @@ export class App extends React.Component<{}, { updateAvailable: boolean }> {
   }
 
   render() {
-    const { timerState, state: { updateAvailable } } = this;
+    const { timerState, config, state: { updateAvailable } } = this;
 
     const analysis = this.timeAnalysis();
 
     return (
       <div className={appBlock()}>
         <Effect1 className={appElem('Effect')} State={timerState === 'stopped' ? 1 : 2} />
-
-        <div className={appElem('StartStopButton')} onClick={this.startStopButtonClick}>
-          { timerState === 'stopped' ? 'Focus!' : 'Stop' }
-        </div>
 
         <IntervalsTimeline Intervals={this.timeIntervals} />
 
@@ -359,16 +366,36 @@ export class App extends React.Component<{}, { updateAvailable: boolean }> {
               </div>
             ))
           }
-          <div className={appElem('AddContextButton')} onClick={this.addContext}>Add</div>
+          <div className={appElem('AddContextButton')} onClick={this.addContext}><FontAwesomeIcon icon='plus' /></div>
         </div>
 
-        <div>
-          <div>Recomendations</div>
-          { JSON.stringify(analysis) }
+        <div className={appElem('Debug')}>
+          <div>
+            Config
+            <MultiLineString String={JSON.stringify(config, null, 4)} />
+          </div>
+          <div>
+            Recomendations
+            <MultiLineString String={JSON.stringify(analysis, null, 4)} />
+          </div>
         </div>
 
         <div className={appElem('Timer')}>
           {MsToTimeString(analysis.focusingTime || 0)}
+
+          <div className={appElem('Buttons')}>
+            <div className={appElem('StartStopButton')} onClick={this.startStopButtonClick}>
+              <FontAwesomeIcon icon={ timerState === 'stopped' ? 'play' : 'stop' } />
+            </div>
+            { analysis.needToSmallRest ?
+              <div className={appElem('TimeoutButton')} onClick={this.startSmallTimeout}>
+                <FontAwesomeIcon icon='coffee' />
+              </div> : null }
+            { analysis.needToLongRest ?
+              <div className={appElem('TimeoutButton')} onClick={this.startLongTimeout}>
+                <FontAwesomeIcon icon='gamepad' />
+              </div> : null }
+          </div>
         </div>
 
         {updateAvailable ? <button onClick={this.appUpdate}>Update!</button> : null}
