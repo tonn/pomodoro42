@@ -3,12 +3,6 @@
 $spacing: 2vw;
 $baseColor: lightgray;
 
-html, body, #root {
-  @include size(100%);
-  position: relative;
-  overflow: hidden;
-}
-
 .App {
   @include size(100%);
   position: relative;

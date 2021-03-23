@@ -1,0 +1,13 @@
+@import './Shared';
+
+html, body {
+  @include size(100%);
+  @include absolute-lt;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+pre {
+  margin: 0;
+}
