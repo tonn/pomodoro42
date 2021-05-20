@@ -1,34 +1,52 @@
 /* eslint-disable no-restricted-globals */
+import fontawesome from '@fortawesome/fontawesome';
+import { faCoffee, faGamepad, faPlay, faPlus, faStop, faTrash } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import _ from 'lodash';
 import { bind } from 'lodash-decorators';
 import React from 'react';
-import './App.scss';
-import { BEM } from './BEM';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import fontawesome from '@fortawesome/fontawesome'
-import { faTrash, faPlus, faPlay, faStop, faCoffee, faGamepad } from '@fortawesome/free-solid-svg-icons';
-import _ from 'lodash';
-import { GetIntersection, IInterval } from './IInterval';
-import { Effect1 } from './Effect1';
-import { PWAUpdateAvailable, skipWaiting } from './serviceWorkerRegistration';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
+import './App.scss';
+import { BEM } from './BEM';
+import { Effect1 } from './Effect1';
 import { MultiLineString } from './helpers';
+import { GetIntersection, IInterval } from './IInterval';
+import { PWAUpdateAvailable, skipWaiting } from './serviceWorkerRegistration';
 
 fontawesome.library.add(...[faTrash, faPlus, faPlay, faStop, faCoffee, faGamepad] as any[]);
 
 // TODO:
-// Показывать кнопки отдыха
-// Показывать тайер отдыха
+// Инвертировать таймер отдыха
 // Сигнал звуковой
-// Показывать статистику по контекстам - как миниму сумарное время за сегодня
-// Сделать настройку времени начала рабочего дня
-
-// Контрол настройки
-// PWA-обновление
+// Сделать отсечку в 1 минуту минимума интервала
+// Показывать незаконченый интервал
+// Показывать текущее время
+// Сделать часовой циферблат с интервалами текущего дня
+// Контрол настройки - редактор json'а прикрутить
 // Подсветка интервалов когда компьютер был включен
+// Показывать уведомление
 // Дизайн
+// Сохранять бекап в файл на GDisk window.showOpenFilePicker() + fsapi
+// Добавить кнопки подвинуть старт текущего интервала +1 мин/-1 мин
 
 type TimerStateType = 'focusing' | 'stopped';
+
+const Config = (!process.env.NODE_ENV || process.env.NODE_ENV === 'development') ? {
+  pomodoroMinutes: 1,
+  smallRestMinutes: 1,
+  longRestMinutes: 5,
+  longRestPerPomodoros: 4,
+  firstDayHour: 6,
+  cheatMultiplier: 30 / 25
+} : {
+  pomodoroMinutes: 25,
+  smallRestMinutes: 5,
+  longRestMinutes: 60,
+  longRestPerPomodoros: 4,
+  firstDayHour: 6,
+  cheatMultiplier: 30 / 25
+}
 
 interface IFocusingInterval {
   start: Date,
@@ -43,11 +61,11 @@ interface ITimeIntervalViewModel {
   width: number
 }
 
-function getStartAndEndOfDay(day: Date): { start: Date, end: Date } {
+function getStartAndEndOfDay(day: Date, offsetHours: number = 0): { start: Date, end: Date } {
   const start = new Date(day);
-  start.setHours(0, 0, 0, 0);
+  start.setHours(offsetHours, 0, 0, 0);
   const end = new Date(day);
-  end.setHours(23, 59, 59, 999);
+  end.setHours(23 + offsetHours, 59, 59, 999);
 
   return { start, end };
 }
@@ -64,7 +82,11 @@ function MsToTimeString(ms: number): string {
   minutes /= 60000;
 
   const minutesString = minutes.toFixed(0);
-  const secondsString = (seconds < 10 ? '0' : '') + seconds.toFixed(0);
+  let secondsString = seconds.toFixed(0);
+
+  if (secondsString.length === 1) {
+    secondsString = '0' + secondsString;
+  }
 
   return `${minutesString}:${secondsString}`
 }
@@ -78,7 +100,7 @@ export class IntervalsTimeline extends React.Component<
   { Intervals: IFocusingInterval[] },
   { DaysOffset: number, DaysCount: number }> {
 
-  private _hours = [...Array(24).keys()].map(h => h + 1);
+  private _hours = [...Array(24).keys()].map(h => (h + Config.firstDayHour) % 24);
 
   constructor(props: any) {
     super(props);
@@ -90,23 +112,47 @@ export class IntervalsTimeline extends React.Component<
     const { DaysOffset, DaysCount } = this.state;
     const { Intervals } = this.props;
 
+    const now = Date.now();
+
     return [...Array(DaysCount).keys()]
       .map(d => d + DaysOffset)
       .map(d => {
         const day = new Date();
         day.setDate(day.getDate() - d);
 
-        const dayInterval = getStartAndEndOfDay(day);
+        const dayInterval = getStartAndEndOfDay(day, Config.firstDayHour);
 
         return Intervals
-          .filter(i => i.start >= dayInterval.start && i.start <= dayInterval.end && !!i.stop)
+          .filter(i => i.start >= dayInterval.start && i.start <= dayInterval.end)
           .map(interval => {
             const start = interval.start.getTime() - dayInterval.start.getTime();
-            const width = interval.stop!.getTime() - interval.start.getTime();
+            const width = (interval.stop?.getTime() || now) - interval.start.getTime();
 
             return { interval, left: 100 * start / DayTicksLength, width: 100 * width / DayTicksLength };
           });
       });
+  }
+
+  getDisplayTime(totalMinutes: number): string {
+    totalMinutes = Math.floor(totalMinutes);
+    const minutes = totalMinutes % 60;
+    const hours = (totalMinutes - minutes) / 60;
+
+    return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+  }
+
+  getTooltip(intervals: ITimeIntervalViewModel[]): string {
+    const now = Date.now();
+
+    return _.chain(intervals)
+     .groupBy(i => i.interval.context || 'default')
+     .map(intervals => {
+      const totalMitutes = MsToMin(_.sum(intervals.map(i => (i.interval.stop?.getTime() || now) - i.interval.start.getTime())));
+
+       return `${intervals[0].interval.context}: ${this.getDisplayTime(totalMitutes)} * ${Config.cheatMultiplier} = ${this.getDisplayTime(totalMitutes * Config.cheatMultiplier)}`;
+     })
+     .value()
+     .join('\n');
   }
 
   render() {
@@ -118,7 +164,7 @@ export class IntervalsTimeline extends React.Component<
 
         {
           this.getDays().map(day => (
-            <div className={elem('Day')}>
+            <div className={elem('Day')} title={this.getTooltip(day)}>
               {day.map(ivm => (
                 <div className={elem('Interval')} style={{ left: `${ivm.left}%`, width: `${ivm.width}%`, backgroundColor: ivm.interval.contextColor }}>
                 </div>
@@ -135,54 +181,86 @@ const { block, elem } = BEM('IntervalsTimeline');
 
 interface IContext { name: string, color: string, current: boolean, readonly?: true }
 
-export class App extends React.Component<{}, { updateAvailable: boolean }> {
+export class App extends React.Component<{}, { updateAvailable: boolean, analysis: any }> {
   private timerState: TimerStateType = 'stopped';
   private intervalRef: NodeJS.Timeout | undefined;
   private timeIntervals: IFocusingInterval[] = [];
   private currentTimeInterval: IFocusingInterval | undefined;
   private contexts: IContext[] = [{ name: 'default', color: 'lightgray', current: true, readonly: true }];
-  private _unmounted$ = new Subject<void>();
-
-  private config = (!process.env.NODE_ENV || process.env.NODE_ENV === 'development') ? {
-    pomodoroMinutes: 1,
-    smallRestMinutes: 1,
-    longRestMinutes: 5,
-    longRestPerPomodoros: 4
-  } : {
-    pomodoroMinutes: 25,
-    smallRestMinutes: 5,
-    longRestMinutes: 60,
-    longRestPerPomodoros: 4
-  }
+  private unmounted$ = new Subject<void>();
+  private smallRestStart: Date | undefined;
+  private longRestStart: Date | undefined;
+  private notificationEnabled = false;
+  private notificationLastTime = 0;
 
   constructor(props: any) {
     super(props);
 
-    this.state = { updateAvailable: false };
+    this.state = { updateAvailable: false, analysis: {} };
 
     this.restore();
   }
 
   componentDidMount() {
-    PWAUpdateAvailable.pipe(takeUntil(this._unmounted$)).subscribe(() => {
+    PWAUpdateAvailable.pipe(takeUntil(this.unmounted$)).subscribe(() => {
       this.setState({ updateAvailable: true });
-    })
+    });
+
+    this.intervalRef = setInterval(this.tick, 1000);
+
+    if (Notification?.permission !== 'granted') {
+      Notification.requestPermission();
+    }
   }
 
   componentWillUnmount() {
-    this._unmounted$.next();
+    this.unmounted$.next();
+
+    clearInterval(this.intervalRef as any);
+    this.intervalRef = undefined;
   }
 
   @bind
   private tick() {
-    if (!this.currentTimeInterval) {
-      const context = this.currentContext;
+    if (this.timerState === 'focusing') {
+      if (!this.currentTimeInterval) {
+        const context = this.currentContext;
 
-      this.currentTimeInterval = { start: new Date(), context: context.name, contextColor: context.color };
-      this.timeIntervals.push(this.currentTimeInterval);
+        this.currentTimeInterval = { start: new Date(), context: context.name, contextColor: context.color };
+        this.timeIntervals.push(this.currentTimeInterval);
+      }
     }
 
-    this.setState({});
+    const { smallRestStart, longRestStart } = this;
+    const now = new Date();
+    const longRestMonitorIntervalStart = new Date();
+    longRestMonitorIntervalStart.setMinutes(now.getMinutes() - (Config.pomodoroMinutes + Config.smallRestMinutes) * Config.longRestPerPomodoros)
+
+    const currentFocusingTime = this.currentTimeInterval ? now.getTime() - this.currentTimeInterval.start.getTime() : undefined;
+    const needToSmallRest = currentFocusingTime && MsToMin(currentFocusingTime) >= Config.pomodoroMinutes;
+    const restTimeForLongPeriod = this.getRestingTimeInInterval(longRestMonitorIntervalStart, now);
+    const needToLongRest = restTimeForLongPeriod < Config.smallRestMinutes * Config.longRestPerPomodoros;
+    const restingStart = smallRestStart || longRestStart;
+    const restingTime = restingStart ? (now.getTime() - restingStart.getTime()) : undefined;
+
+    if (restingTime && restingTime / 60000 > (smallRestStart ? Config.smallRestMinutes : Config.longRestMinutes)) {
+      this.smallRestStart = undefined;
+      this.longRestStart = undefined;
+      this.notificationEnabled = true;
+    }
+
+    if (Notification.permission === 'granted' && !document.hasFocus() &&
+        this.notificationEnabled && (now.getTime() - this.notificationLastTime >= 60 * 1000)) {
+      this.notificationLastTime = now.getTime();
+
+      new Notification('Go to work!', {
+        renotify: true,
+        tag: 'GoToWork!',
+        icon: '/struggle512.png'
+      });
+    }
+
+    this.setState({ analysis: { focusingTime: currentFocusingTime, needToSmallRest, restTimeForLongPeriod, needToLongRest, restingTime } });
   }
 
   private get currentContext(): IContext {
@@ -190,14 +268,10 @@ export class App extends React.Component<{}, { updateAvailable: boolean }> {
   }
 
   private setTimerState(state: TimerStateType) {
-    if (state === 'focusing') {
-      this.intervalRef = setInterval(this.tick, 1000);
-    } else if (state === 'stopped') {
-      if (this.intervalRef) {
-        clearInterval(this.intervalRef);
-        this.intervalRef = undefined;
-      }
+    this.smallRestStart = undefined;
+    this.longRestStart = undefined;
 
+    if (state === 'stopped') {
       if (this.currentTimeInterval) {
         this.currentTimeInterval.stop = new Date();
         this.currentTimeInterval = undefined;
@@ -212,21 +286,20 @@ export class App extends React.Component<{}, { updateAvailable: boolean }> {
 
   @bind
   private startStopButtonClick() {
-    if (this.timerState === 'focusing' && !confirm('Are you sure to stop?')) {
-      return;
-    }
-
+    this.notificationEnabled = false;
     this.setTimerState(this.timerState === 'focusing' ? 'stopped' : 'focusing');
   }
 
   @bind
   private startSmallTimeout() {
-
+    this.setTimerState('stopped');
+    this.smallRestStart = new Date();
   }
 
   @bind
   private startLongTimeout() {
-
+    this.setTimerState('stopped');
+    this.longRestStart = new Date();
   }
 
   private save() {
@@ -281,6 +354,7 @@ export class App extends React.Component<{}, { updateAvailable: boolean }> {
 
   private contextClicked(context: IContext) {
     this.contexts.forEach(ctx => ctx.current = (ctx === context));
+    this.setTimerState('stopped');
 
     this.save();
     this.setState({});
@@ -295,6 +369,10 @@ export class App extends React.Component<{}, { updateAvailable: boolean }> {
   getRestingTimeInInterval(start: Date, end: Date) {
     const focusingIntervals = this.timeIntervals.map(i => GetIntersection({ start, end }, { start: i.start, end: i.stop || end })).filter(i => i !== undefined) as IInterval[];
     const restingIntervals: IInterval[] = [];
+
+    if (focusingIntervals.length === 0) {
+      return MsToMin(end.getTime() - start.getTime());
+    }
 
     for (let i = 0; i < focusingIntervals.length; ++i) {
       const focusingInterval = focusingIntervals[i];
@@ -323,33 +401,17 @@ export class App extends React.Component<{}, { updateAvailable: boolean }> {
     return MsToMin(_.sum(restingIntervals.map(i => i.end.getTime() - i.start.getTime())));
   }
 
-  private timeAnalysis() {
-    const { config } = this;
-    const now = new Date();
-    const longRestMonitorIntervalStart = new Date();
-    longRestMonitorIntervalStart.setMinutes(now.getMinutes() - (config.pomodoroMinutes + config.smallRestMinutes) * config.longRestPerPomodoros)
-
-    const currentFocusingTime = this.currentTimeInterval ? now.getTime() - this.currentTimeInterval.start.getTime() : undefined;
-    const needToSmallRest = currentFocusingTime && MsToMin(currentFocusingTime) >= config.pomodoroMinutes;
-    const restTimeForLongPeriod = this.getRestingTimeInInterval(longRestMonitorIntervalStart, now);
-    const needToLongRest = restTimeForLongPeriod < config.smallRestMinutes * config.longRestPerPomodoros;
-
-    return { focusingTime: currentFocusingTime, needToSmallRest, restTimeForLongPeriod, needToLongRest }
-  }
-
   private async appUpdate() {
     await skipWaiting();
     window.location.reload();
   }
 
   render() {
-    const { timerState, config, state: { updateAvailable } } = this;
-
-    const analysis = this.timeAnalysis();
+    const { timerState, state: { updateAvailable, analysis } } = this;
 
     return (
       <div className={appBlock()}>
-        <Effect1 className={appElem('Effect')} State={timerState === 'stopped' ? 1 : 2} />
+        <Effect1 className={appElem('Effect')} State={this.smallRestStart || this.longRestStart ? 'resting' : timerState} />
 
         <IntervalsTimeline Intervals={this.timeIntervals} />
 
@@ -372,7 +434,8 @@ export class App extends React.Component<{}, { updateAvailable: boolean }> {
         <div className={appElem('Debug')}>
           <div>
             Config
-            <MultiLineString String={JSON.stringify(config, null, 4)} />
+            <MultiLineString String={JSON.stringify(Config, null, 4)} />
+            {/* <JsonEditor json={Config} /> */}
           </div>
           <div>
             Recomendations
@@ -381,7 +444,7 @@ export class App extends React.Component<{}, { updateAvailable: boolean }> {
         </div>
 
         <div className={appElem('Timer')}>
-          {MsToTimeString(analysis.focusingTime || 0)}
+          {MsToTimeString(analysis.focusingTime || analysis.restingTime || 0)} { this.contexts.find(c => c.current)?.name || '' }
 
           <div className={appElem('Buttons')}>
             <div className={appElem('StartStopButton')} onClick={this.startStopButtonClick}>
@@ -391,7 +454,7 @@ export class App extends React.Component<{}, { updateAvailable: boolean }> {
               <div className={appElem('TimeoutButton')} onClick={this.startSmallTimeout}>
                 <FontAwesomeIcon icon='coffee' />
               </div> : null }
-            { analysis.needToLongRest ?
+            { analysis.needToSmallRest && analysis.needToLongRest ?
               <div className={appElem('TimeoutButton')} onClick={this.startLongTimeout}>
                 <FontAwesomeIcon icon='gamepad' />
               </div> : null }

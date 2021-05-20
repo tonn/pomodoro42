@@ -1,4 +1,5 @@
 @import './Shared';
+@import '~jsoneditor/dist/jsoneditor.min.css';
 
 html, body {
   @include size(100%);

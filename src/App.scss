@@ -5,6 +5,8 @@
   @include size(100%);
   @include absolute-lt;
 
+  font-family: monospace;
+
   &__Buttons {
     @include flex;
     font-size: $spacing * 15;
@@ -125,7 +127,12 @@
 
   &__HourTitle {
     flex: 1 1 auto;
-    text-align: center;
-    border-right: 1px solid borderColor($BlueF);
+    text-align: left;
+    padding-left: $spacing;
+    width: percentage(100 / 24);
+
+    &:not(:last-child) {
+      border-right: 1px solid;
+    }
   }
 }

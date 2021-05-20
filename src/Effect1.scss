@@ -2,60 +2,66 @@
 @import 'consts';
 
 .Effect1 {
-  $block: &;
-
-  &__A {
-    background-color: $RedB;
+  @mixin show {
+    @include size(100%);
+    @include absolute-lt(0%);
+    border-radius: 0%;
+    opacity: 1;
+    z-index: 2;
   }
 
-  &__B {
+  @mixin hide {
+    @include size(0%);
+    @include absolute-lt(50%);
+    border-radius: 100%;
+    opacity: 0;
+    z-index: 1;
+  }
+
+  $block: &;
+
+  background-color: $RedB;
+
+  &__Resting {
+    background-color: $BlueB;
+  }
+
+  &__Focusing {
     background-color: $GreenB;
   }
 
-  &__A, &__B {
+  &__Stopped, &__Focusing, &__Resting {
     transition: width .5s, height .5s, left .5s, top .5s, border-radius .5s, opacity .5s;
   }
 
-  &_State1 {
-    background-color: #df5252;
-
-    #{$block}__ {
-      &A {
-        @include size(100%);
-        @include absolute-lt(0%);
-        border-radius: 0%;
-        opacity: 0;
-        z-index: 2;
-      }
-
-      &B {
-        @include size(0%);
-        @include absolute-lt(50%);
-        border-radius: 100%;
-        opacity: 1;
-        z-index: 1;
+  &_stopped {
+    #{$block} {
+      &__Resting, &__Focusing {
+        @include hide;
       }
     }
   }
 
-  &_State2 {
-    background-color: #5bb15b;
-
-    #{$block}__ {
-      &A {
-        @include size(0%);
-        @include absolute-lt(50%);
-        border-radius: 100%;
-        opacity: 1;
-        z-index: 1;
+  &_focusing {
+    #{$block} {
+      &__Resting {
+        @include hide;
       }
 
-      &B {
-        @include size(100%);
-        @include absolute-lt(0%);
-        border-radius: 0%;
-        opacity: 0;
-        z-index: 2;
+      &__Focusing {
+        @include show;
+      }
+    }
+  }
+
+  &_resting {
+    #{$block} {
+      &__Resting {
+        @include show;
+      }
+
+      &__Focusing {
+        @include hide;
       }
     }
   }

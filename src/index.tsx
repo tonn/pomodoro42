@@ -3,10 +3,12 @@ import ReactDOM from 'react-dom';
 import './index.scss';
 import { App } from './App';
 import * as serviceWorkerRegistration from './serviceWorkerRegistration';
+import { Sketch } from './sketch';
 
 ReactDOM.render(
   <React.StrictMode>
     <App />
+    {/* <Sketch /> */}
   </React.StrictMode>,
   document.body
 );
