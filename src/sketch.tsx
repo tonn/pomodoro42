@@ -1,4 +1,4 @@
-import { BEM } from './BEM';
+import { BEM } from './Helpers/BEM';
 import './sketch.scss';
 
 const SketchElem: React.FC<{ className?: string }> = ({ className, children }) => {

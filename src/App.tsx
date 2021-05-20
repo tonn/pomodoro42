@@ -24,7 +24,7 @@ import React from 'react';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import './App.scss';
-import { BEM } from './BEM';
+import { BEM, cn } from './Helpers/BEM';
 import { Effect1 } from './Effect1';
 import { MultiLineString } from './helpers';
 import { Map } from './Helpers/React/Map';
@@ -101,7 +101,7 @@ const LSContexts = 'LSContexts';
 const Colors = ['blue', 'red', 'green', 'yellow', 'black', 'orange'];
 
 export class IntervalsTimeline extends React.Component<
-  { Intervals: IFocusingInterval[] },
+  { Intervals: IFocusingInterval[], className?: string },
   { DaysOffset: number, DaysCount: number }> {
 
   private _hours = [...Array(24).keys()].map(h => (h + Config.firstDayHour) % 24);
@@ -109,7 +109,7 @@ export class IntervalsTimeline extends React.Component<
   constructor(props: any) {
     super(props);
 
-    this.state = { DaysCount: 5, DaysOffset: 0 };
+    this.state = { DaysCount: 50, DaysOffset: 0 };
   }
 
   getDays(): { intervals: ITimeIntervalViewModel[], title: string }[] {
@@ -164,21 +164,23 @@ export class IntervalsTimeline extends React.Component<
 
   render() {
     return (
-      <div className={block()}>
+      <div className={cn(block(), this.props.className)}>
         <div className={elem('HourTitles')}> {
           this._hours.map(h => (<div key={h} className={elem('HourTitle')}>{h}</div>))
         } </div>
 
-        <Map items={this.getDays()} render={day =>
-          <div className={elem('Day')} key={day.title} title={this.getTooltip(day.intervals)}>
-            <div className={elem('DayTitle')}>
-              {day.title}
+        <div className={elem('Scroll')}>
+          <Map items={this.getDays()} render={day =>
+            <div className={elem('Day')} key={day.title} title={this.getTooltip(day.intervals)}>
+              <div className={elem('DayTitle')}>
+                {day.title}
+              </div>
+              <Map items={day.intervals} render={(ivm, index) =>
+                <div className={elem('Interval')} key={index} style={{ left: `${ivm.left}%`, width: `${ivm.width}%`, backgroundColor: ivm.interval.contextColor }}/>
+              } />
             </div>
-            <Map items={day.intervals} render={(ivm, index) =>
-              <div className={elem('Interval')} key={index} style={{ left: `${ivm.left}%`, width: `${ivm.width}%`, backgroundColor: ivm.interval.contextColor }}/>
-            } />
-          </div>
-        } />
+          } />
+        </div>
       </div>
     );
   }
@@ -420,7 +422,7 @@ export class App extends React.Component<{}, { updateAvailable: boolean, analysi
       <div className={appBlock()}>
         <Effect1 className={appElem('Effect')} State={this.smallRestStart || this.longRestStart ? 'resting' : timerState} />
 
-        <IntervalsTimeline Intervals={this.timeIntervals} />
+        <IntervalsTimeline className={appElem('Intervals')} Intervals={this.timeIntervals} />
 
         <div className={appElem('Settings')}>
           <div className={appElem('Contexts')}>

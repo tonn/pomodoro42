@@ -27,6 +27,10 @@
     }
   }
 
+  &__Intervals {
+    max-height: 40vh;
+  }
+
   &__Contexts {
     @include flex(column);
     @include marginSpaceBetweenVertical($spacing / 2);
@@ -100,11 +104,10 @@
 }
 
 .IntervalsTimeline {
-  display: flex;
-  flex-direction: column;
-  //width: 100%;
+  @include flex(column);
+  overflow: hidden;
 
-  $dayHeight: $spacing * 10;
+  $dayHeight: $spacing * 6;
 
   margin: $spacing;
   padding: $spacing;
@@ -114,7 +117,6 @@
   $DayTitle_Width: 80px;
 
   &__Day {
-    //width: 100%;
     border: 1px solid;
     height: $dayHeight;
     position: relative;
@@ -138,6 +140,7 @@
   }
 
   &__HourTitles {
+    flex: 0 0 auto;
     width: 100%;
     display: flex;
     flex-direction: row;
@@ -154,5 +157,10 @@
     &:not(:last-child) {
       border-right: 1px solid;
     }
+  }
+
+  &__Scroll {
+    flex: 1 1 auto;
+    overflow: overlay;
   }
 }

@@ -1,4 +1,4 @@
-import { BEM } from './BEM';
+import { BEM } from './Helpers/BEM';
 import './Effect1.scss';
 
 export const Effect1: React.FC<{ State: 'focusing' | 'stopped' | 'resting' , className?: string }> = ({ State, className }) => {
