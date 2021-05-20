@@ -30,6 +30,7 @@ import { MultiLineString } from './helpers';
 import { Map } from './Helpers/React/Map';
 import { GetIntersection, IInterval } from './IInterval';
 import { PWAUpdateAvailable, skipWaiting } from './serviceWorkerRegistration';
+import { VirtualScroll } from './Helpers/React/VirtualScroll';
 
 fontawesome.library.add(...[faTrash, faPlus, faPlay, faStop, faCoffee, faGamepad] as any[]);
 type TimerStateType = 'focusing' | 'stopped';
@@ -112,32 +113,32 @@ export class IntervalsTimeline extends React.Component<
     this.state = { DaysCount: 50, DaysOffset: 0 };
   }
 
-  getDays(): { intervals: ITimeIntervalViewModel[], title: string }[] {
-    const { DaysOffset, DaysCount } = this.state;
+  getAllDays() {
+    const firstInterval = this.props.Intervals[0];
+
+    const daysCount = (Date.now() - firstInterval.start.getTime()) / (24 * 60 * 60 * 1000);
+
+    return [...Array(Math.ceil(daysCount)).keys()];
+  }
+
+  getDay(date: Date): { intervals: ITimeIntervalViewModel[], title: string } {
     const { Intervals } = this.props;
 
     const now = Date.now();
 
-    return [...Array(DaysCount).keys()]
-      .map(d => d + DaysOffset)
-      .map(d => {
-        const day = new Date();
-        day.setDate(day.getDate() - d);
+    const dayInterval = getStartAndEndOfDay(date, Config.firstDayHour);
 
-        const dayInterval = getStartAndEndOfDay(day, Config.firstDayHour);
+    return {
+      title: moment(date).format('DD.MM dd'),
+      intervals: Intervals
+      .filter(i => i.start >= dayInterval.start && i.start <= dayInterval.end)
+      .map(interval => {
+        const start = interval.start.getTime() - dayInterval.start.getTime();
+        const width = (interval.stop?.getTime() || now) - interval.start.getTime();
 
-        return {
-          title: moment(day).format('DD.MM dd'),
-          intervals: Intervals
-          .filter(i => i.start >= dayInterval.start && i.start <= dayInterval.end)
-          .map(interval => {
-            const start = interval.start.getTime() - dayInterval.start.getTime();
-            const width = (interval.stop?.getTime() || now) - interval.start.getTime();
-
-            return { interval, left: 100 * start / DayTicksLength, width: 100 * width / DayTicksLength };
-          })
-        }
-      });
+        return { interval, left: 100 * start / DayTicksLength, width: 100 * width / DayTicksLength };
+      })
+    }
   }
 
   getDisplayTime(totalMinutes: number): string {
@@ -152,35 +153,45 @@ export class IntervalsTimeline extends React.Component<
     const now = Date.now();
 
     return _.chain(intervals)
-     .groupBy(i => i.interval.context || 'default')
-     .map(intervals => {
+      .groupBy(i => i.interval.context || 'default')
+      .map(intervals => {
       const totalMitutes = MsToMin(_.sum(intervals.map(i => (i.interval.stop?.getTime() || now) - i.interval.start.getTime())));
 
-       return `${intervals[0].interval.context}: ${this.getDisplayTime(totalMitutes)} * ${Config.cheatMultiplier} = ${this.getDisplayTime(totalMitutes * Config.cheatMultiplier)}`;
-     })
-     .value()
-     .join('\n');
+        return `${intervals[0].interval.context}: ${this.getDisplayTime(totalMitutes)} * ${Config.cheatMultiplier} = ${this.getDisplayTime(totalMitutes * Config.cheatMultiplier)}`;
+      })
+      .value()
+      .join('\n');
+  }
+
+  @bind
+  renderItem(index: number) {
+    const date = new Date();
+    date.setDate(date.getDate() - index);
+
+    const day = this.getDay(date);
+
+    return <div className={elem('Day')} key={day.title} title={this.getTooltip(day.intervals)}>
+      <div className={elem('DayTitle')}>
+        {day.title}
+      </div>
+      <div className={elem('DayIntervals')}>
+        <Map items={day.intervals} render={(ivm, index) =>
+          <div className={elem('Interval')} key={index} style={{ left: `${ivm.left}%`, width: `${ivm.width}%`, backgroundColor: ivm.interval.contextColor }}/>
+        } />
+      </div>
+    </div>;
   }
 
   render() {
     return (
       <div className={cn(block(), this.props.className)}>
-        <div className={elem('HourTitles')}> {
-          this._hours.map(h => (<div key={h} className={elem('HourTitle')}>{h}</div>))
-        } </div>
-
-        <div className={elem('Scroll')}>
-          <Map items={this.getDays()} render={day =>
-            <div className={elem('Day')} key={day.title} title={this.getTooltip(day.intervals)}>
-              <div className={elem('DayTitle')}>
-                {day.title}
-              </div>
-              <Map items={day.intervals} render={(ivm, index) =>
-                <div className={elem('Interval')} key={index} style={{ left: `${ivm.left}%`, width: `${ivm.width}%`, backgroundColor: ivm.interval.contextColor }}/>
-              } />
-            </div>
+        <div className={elem('HourTitles')}>
+          <Map items={this._hours} render={h =>
+            <div key={h} className={elem('HourTitle')}>{h}</div>
           } />
         </div>
+
+        <VirtualScroll items={this.getAllDays()} renderItem={this.renderItem}/>
       </div>
     );
   }

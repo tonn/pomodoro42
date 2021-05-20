@@ -28,7 +28,7 @@
   }
 
   &__Intervals {
-    max-height: 40vh;
+    height: 40vh;
   }
 
   &__Contexts {
@@ -117,6 +117,7 @@
   $DayTitle_Width: 80px;
 
   &__Day {
+    @include flex;
     border: 1px solid;
     height: $dayHeight;
     position: relative;
@@ -128,8 +129,14 @@
 
   &__DayTitle {
     @include flex-vertical-center;
+    flex: 0 0 auto;
     width: $DayTitle_Width;
     height: 100%;
+  }
+
+  &__DayIntervals {
+    position: relative;
+    flex: 1 1 auto;
   }
 
   &__Interval {
@@ -141,11 +148,12 @@
 
   &__HourTitles {
     flex: 0 0 auto;
-    width: 100%;
+    width: calc(100% - #{$DayTitle_Width});
     display: flex;
     flex-direction: row;
     overflow: hidden;
-    padding-left: $DayTitle_Width;
+    position: relative;
+    margin-left: $DayTitle_Width;
   }
 
   &__HourTitle {
