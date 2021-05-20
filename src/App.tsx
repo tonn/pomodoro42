@@ -1,20 +1,4 @@
 /* eslint-disable no-restricted-globals */
-import fontawesome from '@fortawesome/fontawesome';
-import { faCoffee, faGamepad, faPlay, faPlus, faStop, faTrash } from '@fortawesome/free-solid-svg-icons';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import _ from 'lodash';
-import { bind } from 'lodash-decorators';
-import React from 'react';
-import { Subject } from 'rxjs';
-import { takeUntil } from 'rxjs/operators';
-import './App.scss';
-import { BEM } from './BEM';
-import { Effect1 } from './Effect1';
-import { MultiLineString } from './helpers';
-import { GetIntersection, IInterval } from './IInterval';
-import { PWAUpdateAvailable, skipWaiting } from './serviceWorkerRegistration';
-
-fontawesome.library.add(...[faTrash, faPlus, faPlay, faStop, faCoffee, faGamepad] as any[]);
 
 // TODO:
 // Инвертировать таймер отдыха
@@ -30,7 +14,27 @@ fontawesome.library.add(...[faTrash, faPlus, faPlay, faStop, faCoffee, faGamepad
 // Сохранять бекап в файл на GDisk window.showOpenFilePicker() + fsapi
 // Добавить кнопки подвинуть старт текущего интервала +1 мин/-1 мин
 
+import fontawesome from '@fortawesome/fontawesome';
+import { faCoffee, faGamepad, faPlay, faPlus, faStop, faTrash } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import _ from 'lodash';
+import { bind } from 'lodash-decorators';
+import moment from 'moment';
+import React from 'react';
+import { Subject } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
+import './App.scss';
+import { BEM } from './BEM';
+import { Effect1 } from './Effect1';
+import { MultiLineString } from './helpers';
+import { Map } from './Helpers/React/Map';
+import { GetIntersection, IInterval } from './IInterval';
+import { PWAUpdateAvailable, skipWaiting } from './serviceWorkerRegistration';
+
+fontawesome.library.add(...[faTrash, faPlus, faPlay, faStop, faCoffee, faGamepad] as any[]);
 type TimerStateType = 'focusing' | 'stopped';
+
+moment.locale('ru_RU');
 
 const Config = (!process.env.NODE_ENV || process.env.NODE_ENV === 'development') ? {
   pomodoroMinutes: 1,
@@ -108,7 +112,7 @@ export class IntervalsTimeline extends React.Component<
     this.state = { DaysCount: 5, DaysOffset: 0 };
   }
 
-  getDays(): ITimeIntervalViewModel[][] {
+  getDays(): { intervals: ITimeIntervalViewModel[], title: string }[] {
     const { DaysOffset, DaysCount } = this.state;
     const { Intervals } = this.props;
 
@@ -122,14 +126,17 @@ export class IntervalsTimeline extends React.Component<
 
         const dayInterval = getStartAndEndOfDay(day, Config.firstDayHour);
 
-        return Intervals
+        return {
+          title: moment(day).format('DD.MM dd'),
+          intervals: Intervals
           .filter(i => i.start >= dayInterval.start && i.start <= dayInterval.end)
           .map(interval => {
             const start = interval.start.getTime() - dayInterval.start.getTime();
             const width = (interval.stop?.getTime() || now) - interval.start.getTime();
 
             return { interval, left: 100 * start / DayTicksLength, width: 100 * width / DayTicksLength };
-          });
+          })
+        }
       });
   }
 
@@ -162,16 +169,16 @@ export class IntervalsTimeline extends React.Component<
           this._hours.map(h => (<div key={h} className={elem('HourTitle')}>{h}</div>))
         } </div>
 
-        {
-          this.getDays().map(day => (
-            <div className={elem('Day')} title={this.getTooltip(day)}>
-              {day.map(ivm => (
-                <div className={elem('Interval')} style={{ left: `${ivm.left}%`, width: `${ivm.width}%`, backgroundColor: ivm.interval.contextColor }}>
-                </div>
-              ))}
+        <Map items={this.getDays()} render={day =>
+          <div className={elem('Day')} key={day.title} title={this.getTooltip(day.intervals)}>
+            <div className={elem('DayTitle')}>
+              {day.title}
             </div>
-          ))
-        }
+            <Map items={day.intervals} render={(ivm, index) =>
+              <div className={elem('Interval')} key={index} style={{ left: `${ivm.left}%`, width: `${ivm.width}%`, backgroundColor: ivm.interval.contextColor }}/>
+            } />
+          </div>
+        } />
       </div>
     );
   }
@@ -415,29 +422,28 @@ export class App extends React.Component<{}, { updateAvailable: boolean, analysi
 
         <IntervalsTimeline Intervals={this.timeIntervals} />
 
-        <div className={appElem('Contexts')}>
-          {
-            this.contexts.map(context => (
-              <div className={appElem('Context', context.current ? 'Current' : undefined)} onClick={() => this.contextClicked(context)}>
-                <div className={appElem('ContextColor')} style={{ backgroundColor: context.color }} />
+        <div className={appElem('Settings')}>
+          <div className={appElem('Contexts')}>
+            {
+              this.contexts.map(context => (
+                <div className={appElem('Context', context.current ? 'Current' : undefined)} key={context.name} onClick={() => this.contextClicked(context)}>
+                  <div className={appElem('ContextColor')} style={{ backgroundColor: context.color }} />
 
-                <input value={context.name} onChange={e => this.contextNameChanged(e, context)} readOnly={context.readonly} />
+                  <input value={context.name} onChange={e => this.contextNameChanged(e, context)} readOnly={context.readonly} />
 
-                { context.readonly ? null :
-                  <FontAwesomeIcon icon='trash' className={appElem('ContextRemove')} onClick={e => this.removeContext(e, context)} /> }
-              </div>
-            ))
-          }
-          <div className={appElem('AddContextButton')} onClick={this.addContext}><FontAwesomeIcon icon='plus' /></div>
-        </div>
-
-        <div className={appElem('Debug')}>
-          <div>
+                  { context.readonly ? null :
+                    <FontAwesomeIcon icon='trash' className={appElem('ContextRemove')} onClick={e => this.removeContext(e, context)} /> }
+                </div>
+              ))
+            }
+            <div className={appElem('AddContextButton')} onClick={this.addContext}><FontAwesomeIcon icon='plus' /></div>
+          </div>
+          <div className={elem('Debug')}>
             Config
             <MultiLineString String={JSON.stringify(Config, null, 4)} />
             {/* <JsonEditor json={Config} /> */}
           </div>
-          <div>
+          <div className={elem('Debug')}>
             Recomendations
             <MultiLineString String={JSON.stringify(analysis, null, 4)} />
           </div>

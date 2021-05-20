@@ -5,6 +5,12 @@
   @include size(100%);
   @include absolute-lt;
 
+  @include flex(column);
+
+  > * {
+    flex: 0 0 auto;
+  }
+
   font-family: monospace;
 
   &__Buttons {
@@ -77,10 +83,15 @@
 
   &__Timer {
     @include flex-center(column);
+    flex: 1 1 auto;
     font-family: monospace;
     width: 100%;
     font-size: $spacing * 40;
     text-align: center;
+  }
+
+  &__Settings {
+    @include flex(row);
   }
 
   &__Debug {
@@ -100,6 +111,8 @@
   background-color: #fff5;
   border-radius: $spacing;
 
+  $DayTitle_Width: 80px;
+
   &__Day {
     //width: 100%;
     border: 1px solid;
@@ -111,8 +124,14 @@
     }
   }
 
+  &__DayTitle {
+    @include flex-vertical-center;
+    width: $DayTitle_Width;
+    height: 100%;
+  }
+
   &__Interval {
-    position: absolute;
+    @include absolute-lt;
     background-color: gray;
     height: $dayHeight;
     min-width: 1px;
@@ -123,6 +142,7 @@
     display: flex;
     flex-direction: row;
     overflow: hidden;
+    padding-left: $DayTitle_Width;
   }
 
   &__HourTitle {
