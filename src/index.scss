@@ -1,5 +1,7 @@
-@import './Shared';
-@import '~jsoneditor/dist/jsoneditor.min.css';
+@import "~bootstrap/scss/bootstrap";
+@import "~react-datepicker/dist/react-datepicker.css";
+
+@import "./Shared";
 
 html, body {
   @include size(100%);

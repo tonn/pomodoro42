@@ -1,0 +1,12 @@
+@import 'Shared';
+
+.JsonModalEditor {
+  width: 95vw;
+  max-width: 95vw;
+  height: 95vh;
+  max-height: 95vh;
+
+  .je-object__title {
+    display: none !important;
+  }
+}

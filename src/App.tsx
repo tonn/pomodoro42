@@ -1,38 +1,57 @@
 /* eslint-disable no-restricted-globals */
 
 // TODO:
+// Сделать настройку интервала повторяющегося уведомления о том что отдых закончился
+// Перенести настройки интервалов вверх
+// Сделать сохранение настроек в localstorage
 // Инвертировать таймер отдыха
 // Сигнал звуковой
 // Сделать отсечку в 1 минуту минимума интервала
-// Показывать незаконченый интервал
+// Показывать незаконченный интервал
 // Показывать текущее время
 // Сделать часовой циферблат с интервалами текущего дня
-// Контрол настройки - редактор json'а прикрутить
-// Подсветка интервалов когда компьютер был включен
-// Показывать уведомление
 // Дизайн
-// Сохранять бекап в файл на GDisk window.showOpenFilePicker() + fsapi
+// Сохранять бекап в файл на GDisk window.showOpenFilePicker() + fsapi или привязаться к store42
 // Добавить кнопки подвинуть старт текущего интервала +1 мин/-1 мин
+// Вертикальные линии для полудня и полуночи
+// Оптимизация отрисовки - сейчас рисуется все каждую секунду
+// Попробовать стейт на бехейвиоре
+// Подсвечивать слишком длинные перерывы
+//
+// DONE:
+// Показывать уведомление
+// Выделять выходные дни
+// Название текущего контекста у таймера - комбобокс переключения контекстов
+// Контрол настройки - редактор json'а прикрутить, в модалке
+// Спрятать в настройки список контекстов
+//
+// REJECTED:
+// Выделять активности которые приносят бабло
+// Подсветка интервалов когда компьютер был включен
 
 import fontawesome from '@fortawesome/fontawesome';
-import { faCoffee, faGamepad, faPlay, faPlus, faStop, faTrash } from '@fortawesome/free-solid-svg-icons';
+import { faCoffee, faGamepad, faPlay, faPlus, faStop, faTrash, faWrench, faMinus, faCalendar } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import _ from 'lodash';
 import { bind } from 'lodash-decorators';
 import moment from 'moment';
-import React from 'react';
+import React, { createRef } from 'react';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import './App.scss';
 import { BEM, cn } from './Helpers/BEM';
 import { Effect1 } from './Effect1';
-import { MultiLineString } from './helpers';
 import { Map } from './Helpers/React/Map';
 import { GetIntersection, IInterval } from './IInterval';
 import { PWAUpdateAvailable, skipWaiting } from './serviceWorkerRegistration';
 import { VirtualScroll } from './Helpers/React/VirtualScroll';
+import { JsonModalEditor, JsonModalEditorRef } from './JsonModalEditor';
+import { Dropdown } from 'react-bootstrap';
+import { Nbsp } from './Helpers/React/Nbsp';
+import { IFocusingInterval } from './IFocusingInterval';
+import { ReportsDialog, ReportsDialogRef } from './Report';
 
-fontawesome.library.add(...[faTrash, faPlus, faPlay, faStop, faCoffee, faGamepad] as any[]);
+fontawesome.library.add(...[faTrash, faPlus, faPlay, faStop, faCoffee, faGamepad, faWrench, faMinus, faCalendar] as any[]);
 type TimerStateType = 'focusing' | 'stopped';
 
 moment.locale('ru_RU');
@@ -51,13 +70,6 @@ const Config = (!process.env.NODE_ENV || process.env.NODE_ENV === 'development')
   longRestPerPomodoros: 4,
   firstDayHour: 6,
   cheatMultiplier: 30 / 25
-}
-
-interface IFocusingInterval {
-  start: Date,
-  stop?: Date,
-  context?: string,
-  contextColor?: string
 }
 
 interface ITimeIntervalViewModel {
@@ -101,6 +113,12 @@ const LSIntervals = 'LSIntervals';
 const LSContexts = 'LSContexts';
 const Colors = ['blue', 'red', 'green', 'yellow', 'black', 'orange'];
 
+function isWeekend(date: Date) {
+  const day = date.getDay();
+
+  return day === 0 || day === 6;
+}
+
 export class IntervalsTimeline extends React.Component<
   { Intervals: IFocusingInterval[], className?: string },
   { DaysOffset: number, DaysCount: number }> {
@@ -114,7 +132,7 @@ export class IntervalsTimeline extends React.Component<
   }
 
   getAllDays() {
-    const firstInterval = this.props.Intervals[0];
+    const firstInterval = this.props.Intervals[0] || { start: new Date() };
 
     const daysCount = (Date.now() - firstInterval.start.getTime()) / (24 * 60 * 60 * 1000);
 
@@ -170,7 +188,7 @@ export class IntervalsTimeline extends React.Component<
 
     const day = this.getDay(date);
 
-    return <div className={elem('Day')} key={day.title} title={this.getTooltip(day.intervals)}>
+    return <div className={elem('Day', isWeekend(date) && 'Weekend')} key={day.title} title={this.getTooltip(day.intervals)}>
       <div className={elem('DayTitle')}>
         {day.title}
       </div>
@@ -212,6 +230,8 @@ export class App extends React.Component<{}, { updateAvailable: boolean, analysi
   private longRestStart: Date | undefined;
   private notificationEnabled = false;
   private notificationLastTime = 0;
+  private configEditorModalRef = createRef<JsonModalEditorRef>();
+  private reportRef = createRef<ReportsDialogRef>();
 
   constructor(props: any) {
     super(props);
@@ -372,6 +392,7 @@ export class App extends React.Component<{}, { updateAvailable: boolean, analysi
     this.setState({});
   }
 
+  @bind
   private contextClicked(context: IContext) {
     this.contexts.forEach(ctx => ctx.current = (ctx === context));
     this.setTimerState('stopped');
@@ -426,6 +447,32 @@ export class App extends React.Component<{}, { updateAvailable: boolean, analysi
     window.location.reload();
   }
 
+  @bind
+  private async editConfig() {
+    if (!this.configEditorModalRef.current) {
+      throw Error('editor has not been created');
+    }
+
+    const result = await this.configEditorModalRef.current.Show$({
+      contexts: this.contexts,
+      config: Config
+    });
+
+    this.contexts = result.contexts;
+    Object.assign(Config, result.config);
+
+    this.save();
+  }
+
+  @bind
+  private async report() {
+    if (!this.reportRef.current) {
+      throw Error('editor has not been created');
+    }
+
+    await this.reportRef.current.Show$(this.timeIntervals);
+  }
+
   render() {
     const { timerState, state: { updateAvailable, analysis } } = this;
 
@@ -435,36 +482,26 @@ export class App extends React.Component<{}, { updateAvailable: boolean, analysi
 
         <IntervalsTimeline className={appElem('Intervals')} Intervals={this.timeIntervals} />
 
-        <div className={appElem('Settings')}>
-          <div className={appElem('Contexts')}>
-            {
-              this.contexts.map(context => (
-                <div className={appElem('Context', context.current ? 'Current' : undefined)} key={context.name} onClick={() => this.contextClicked(context)}>
-                  <div className={appElem('ContextColor')} style={{ backgroundColor: context.color }} />
-
-                  <input value={context.name} onChange={e => this.contextNameChanged(e, context)} readOnly={context.readonly} />
-
-                  { context.readonly ? null :
-                    <FontAwesomeIcon icon='trash' className={appElem('ContextRemove')} onClick={e => this.removeContext(e, context)} /> }
-                </div>
-              ))
-            }
-            <div className={appElem('AddContextButton')} onClick={this.addContext}><FontAwesomeIcon icon='plus' /></div>
-          </div>
-          <div className={elem('Debug')}>
-            Config
-            <MultiLineString String={JSON.stringify(Config, null, 4)} />
-            {/* <JsonEditor json={Config} /> */}
-          </div>
-          <div className={elem('Debug')}>
-            Recomendations
-            <MultiLineString String={JSON.stringify(analysis, null, 4)} />
-          </div>
-        </div>
-
         <div className={appElem('Timer')}>
-          {MsToTimeString(analysis.focusingTime || analysis.restingTime || 0)} { this.contexts.find(c => c.current)?.name || '' }
+          {MsToTimeString(analysis.focusingTime || analysis.restingTime || 0)}
+          <Nbsp />
+          {/* <Dropdown className={appElem('ContextSelect')}>
+            <Dropdown.Toggle as={React.forwardRef<{}, { onClick: any }>(({ onClick }, ref) => {
+              return <span ref={ref as any} onClick={onClick}>{this.contexts.find(c => c.current)?.name}</span>
+            })} />
 
+            <Dropdown.Menu>
+              <Map items={this.contexts} render={(item, index) => (
+                <Dropdown.Item id={item.name} eventKey={index} active={item.current}
+                              onSelect={() => this.contextClicked(item)}>
+                  <div className={appElem('ContextColorTag')} style={{ background: item.color }} /> {item.name}
+                </Dropdown.Item>
+              )} />
+            </Dropdown.Menu>
+          </Dropdown> */}
+          <ContextSelectMemo contexts={this.contexts} contextClicked={this.contextClicked} />
+
+          <div className='FlexBreak' />
           <div className={appElem('Buttons')}>
             <div className={appElem('StartStopButton')} onClick={this.startStopButtonClick}>
               <FontAwesomeIcon icon={ timerState === 'stopped' ? 'play' : 'stop' } />
@@ -477,13 +514,38 @@ export class App extends React.Component<{}, { updateAvailable: boolean, analysi
               <div className={appElem('TimeoutButton')} onClick={this.startLongTimeout}>
                 <FontAwesomeIcon icon='gamepad' />
               </div> : null }
+            <div className={appElem('TimeoutButton')} onClick={this.editConfig}>
+              <FontAwesomeIcon icon='wrench' />
+            </div>
+            <div className={appElem('TimeoutButton')} onClick={this.report}>
+              <FontAwesomeIcon icon='calendar' />
+            </div>
           </div>
         </div>
 
         {updateAvailable ? <button onClick={this.appUpdate}>Update!</button> : null}
+
+        <JsonModalEditor ref={this.configEditorModalRef}/>
+        <ReportsDialog ref={this.reportRef} />
       </div>
     );
   }
 }
 
 const { block: appBlock, elem: appElem } = BEM('App');
+
+const ContextSelectMemo = React.memo<{ contexts: IContext[], contextClicked: (context: IContext) => void }>(({ contexts, contextClicked }) => (
+  <Dropdown className={appElem('ContextSelect')}>
+    <Dropdown.Toggle as={React.forwardRef<{}, { onClick: any }>(({ onClick }, ref) => {
+      return <span ref={ref as any} onClick={onClick}>{contexts.find(c => c.current)?.name}</span>
+    })} />
+
+    <Dropdown.Menu>
+      <Map items={contexts} render={(item, index) => (
+        <Dropdown.Item key={item.name} eventKey={index} onSelect={() => contextClicked(item)}>
+          <div className={appElem('ContextColorTag')} style={{ background: item.color }} /> {item.name}
+        </Dropdown.Item>
+      )} />
+    </Dropdown.Menu>
+  </Dropdown>
+));
